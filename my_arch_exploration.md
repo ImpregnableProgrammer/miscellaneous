@@ -9,7 +9,7 @@
   - [Kernel parameters and Disk/filesystem stats](#kernel-parameters-and-diskfilesystem-stats)
   - [Block/character special files](#blockcharacter-special-files)
   - [Disk encryption](#disk-encryption)
-  - [Git commit signing using `gpg`](#git-commit-signing-using-gpg)
+  - [Git commit signing using `gpg` and how key pairs work](#git-commit-signing-using-gpg-and-how-key-pairs-work)
   - [Modifying `sudo` and `PAM` behavior](#modifying-sudo-and-pam-behavior)
   - [Using the Arch User Repository (AUR)](#using-the-arch-user-repository-aur)
   - [Querying GPU/CPU stats](#querying-gpucpu-stats)
@@ -1049,11 +1049,21 @@ is generated. However, this is okay and the device is not misaligned with the pa
 sets the partition up with where it writes the file system that this happens, and the allocated block device is set up to start writing/reading encrypted data at the sector where the
 filesystem begins, and the security header (containing the encryption key) is written along with the filesystem.
 
-## Git commit signing using `gpg`
-Sign and verify commit signatures using git: https://medium.com/@petehouston/quick-guide-to-sign-your-git-commits-c11ce58c22e9, 
+## Git commit signing using `gpg` and how key pairs work
+Sign and verify commit signatures using git:\
+https://medium.com/@petehouston/quick-guide-to-sign-your-git-commits-c11ce58c22e9 \
 https://www.cloudwithchris.com/blog/gpg-git-part-2/ \
-All about subkeys!: https://wiki.debian.org/Subkeys
-Use `gpg` for creating code-signing keys/sub-keys that you can then publish to the ubuntu keyshare and add to GitHub!
+All about subkeys!: https://wiki.debian.org/Subkeys \
+Use `gpg` for creating code-signing keys/sub-keys that you can then publish to the ubuntu keyshare and add to GitHub! Private sub-keys are used for signing/decryption, while the primary key is only ever used for making _major_ changes to the keypair, like changing the password. \
+All you have to do is generate a signing key-pair on the machine using `gpg`, then add the _public_ key in ASCII-armor format (given by `gpg --armor --export <keyid>`) to your GitHub profile! You
+then just tell your local `git` install to sign your commits using your _private_ key by setting `git config --global user.signingkey=<keyid>` and then telling `git` to use
+your local `gpg` install for signing with `git config --global gpg.program=$(which gpg)`.\
+Also, if there's an error like `gpg: signing failed: Inappropriate ioctl for device` while committing, run `export GPG_TTY=$(tty)` and add it to `~/.bashrc`.\
+See https://docs.github.com/en/authentication/managing-commit-signature-verification \
+You _encrypt_ the message that's _sent_ with the recipient's _public_ key, and then the recipient _decrypts_ it with their _private_ key. And you _verify_ the data that's _received_ with the sender's _public_ key, which they _sign_ using their _private_ key. Take sending and receiving data from your account on GitHub for instance. First you add your SSH _public_ key to your GitHub profile. Then when receiving data over SSH for the first time from GitHub, their _public_ key is given to you. Then you can _verify_ that the data indeed came from GitHub using their _public_ key and, you can _decrypt_ the data using your _private_ key, which they _encrypted_ using your _public_ key and _signed_ using their _private_ key! In the opposite direction, when _sending_ data to GitHub, you _encrypt_ it using GitHub's _public_ key and _sign_ it using your _private_ key, and then they can only _decrypt_ it using their _private_ key (so you can be sure that only GitHub can read the data) and they _verify_ that it came from you using your _public_ key! Notice that GitHub _only_ needs your public key and you _only_ need their public key for this all to work, and the private key never leaves the owner's possession! Look at `~/.ssh/known_hosts` for GitHub's public keys. This is pretty much how _any_ communication over SSH takes place, where you place your public key on the server and you place their's in `~/.ssh/known_hosts`!\
+Separating SSH and GPG keys this way ensures that even if someone else manages to get ahold of your SSH private key and can access your account, the commit would still show up as unverified if they don't also have one of your private GPG sub-keys, which you can easily deactivate and regenerate from your primary private key if it were also compromised.\
+You can also publish your public GPG keys on online keyshares such as `https://keyserver.ubuntu.com/` so others can easily find them! Use `gpg --send-keys <keyid>` to do this. You can also search for keys on the keyservers by going to the website or using `gpg --search-keys <url> <search string>`. \
+Key servers: https://en.wikipedia.org/wiki/Key_server_(cryptographic)
 
 ## Modifying `sudo` and `PAM` behavior
 Configure `sudo` behavior using `/etc/sudoers` file with the "Defaults" directive: https://www.sudo.ws/docs/man/sudoers.man/#SUDOERS_OPTIONS\

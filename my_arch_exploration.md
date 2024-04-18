@@ -1089,7 +1089,7 @@ The interesting bit is how the lockout period and other options seem to have an 
 attempts allowed doesn't seem to change anything. This is because this is overridden by `sudo` itself, and the option in `/etc/security/faillock.conf`
 just sets the default for _all_ programs that don't override it! Therefore, to change the max number of attempts, you must modify the `sudoers` file
 using `visudo`, but all other (tested) behavior can be changed in `faillock.conf`.\
-LEARN MORE: https://man.archlinux.org/man/core/pam/faillock.conf.5.en\
+LEARN MORE: https://man.archlinux.org/man/core/pam/faillock.conf.5.en \
 NOTE: The `faillock` command line utility can be used to reset the current user's failed attempts (tracked in `/var/run/faillock/<user>`) using `faillock --reset` 
 thereby bypassing the lockout. Also, `sudo -k` can be used toi reset the current user's root auth status (so they have to enter their password on the next usage)
 

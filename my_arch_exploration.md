@@ -1118,4 +1118,4 @@ _Man_ was this quite the scare with the system not booting...
 * Fixed `zram` config issue with the `writeback-device` parameter not working for some reason, which involved modifying the `/etc/systemd/zram-generator.conf`configuration file and restarting the `systemd-zram-setup@zram0` systemd service.
   * Before the fix, the service was just failing to launch, which halted the entire `systemd` startup process and threw me into an emergency shell.
 * Fixed issue with `mount`ing on `/home` failing based on how it was defined in `/etc/fstab` since the btrfs subvolume `@home` got moved into the `/home` root directory somehow. This involved simply commenting out the `/home` mounting in `/etc/fstab`
-  * Before the fix, the `local-fs.target` systemd target was failing to complete since `mount -a` was failing.
+  * Before the fix, the `local-fs.target` systemd target was failing to complete since `mount -a`

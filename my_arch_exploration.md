@@ -13,6 +13,7 @@
   - [Modifying `sudo` and `PAM` behavior](#modifying-sudo-and-pam-behavior)
   - [Using the Arch User Repository (AUR)](#using-the-arch-user-repository-aur)
   - [Querying GPU/CPU stats](#querying-gpucpu-stats)
+  - [Fixes on 4-19-24 for fixing bad boot issue](#fixes-on-4-19-24-for-fixing-bad-boot-issue)
 
 ## Rootless Docker setup
 Set up `rootless` Docker on Linux (so each user can have their own instance of the Docker daemon running, which provides better container isolation): https://docs.docker.com/engine/security/rootless/ \
@@ -805,17 +806,19 @@ Also looking for `zswap` files (look it up on the Arch wiki...) in a similar way
 /sys/module/zswap/parameters/accept_threshold_percent
 /usr/lib/modules/6.8.4-arch1-1/build/include/linux/zswap.h
 ```
-However, looking at the `/proc/cmdline` file on my system, thr `zswap` feature seems to be disabled with the `zswap.enabled=0` kernel parameter...
+However, looking at the `/proc/cmdline` file on my system, the `zswap` feature seems to be disabled with the `zswap.enabled=0` kernel parameter...
 
 zram configuration file: `/etc/systemd/zram-generator.conf` \
+This is the configuration file used whenever the `systemd-zram-setup@zram0` systemd service is invoked during startup to create the `/dev/zram0` swap device.
 
 ## Linux swappiness
 `vm.swappiness` kernel parameter delegates between prioritizing freeing up anonymous (stack/heap) memory or
 file pages from RAM! 
 https://www.howtogeek.com/449691/what-is-swapiness-on-linux-and-how-to-change-it/ \
-Set the `vm.swappiness` value in the bootloader config to change it!
+Set the `sysctl.vm.swappiness` value in the bootloader config to change it!
 Value of 100 completely balances the priority\
 Virtual file system (VFS): https://www.usenix.org/legacy/publications/library/proceedings/usenix01/full_papers/kroeger/kroeger_html/node8.html
+Linux swap: https://wiki.archlinux.org/title/swap
 
 ## Disk partitioning and memory swap setup
 Linux filesystem type uuid in GPT (partition table scheme that's better than MBR):\
@@ -891,7 +894,7 @@ Finally, to use this swapfile (or any swap partition) for hibernating
   ```
   Then write this offset using `echo <offset> | sudo tee /sys/power/resume_offset`
 * Then add the following as kernel parameters to the `/boot/loader/entries/*.conf` boot
-  config file at the end of the `options` line
+  config file at the end of the `options` line (which is how to configure _any_ kernel parameters)
   ```
   resume=/dev/<device> resume_offset=<offset>
   ```
@@ -921,6 +924,8 @@ Finally, to use this swapfile (or any swap partition) for hibernating
 so the necessary setup steps can occur, such as decrypting the disk and resuming from the hibernation image!
 
 ## Kernel parameters and Disk/filesystem stats
+Kernel parameters: https://wiki.archlinux.org/title/Kernel_parameters \
+Hot-loadable Kernel modules: https://wiki.archlinux.org/title/Kernel_module \
 `sysctl` - set and probe kernel parameters\
 `systemctl (for systemd)` - manage system services/daemons launched during `init` late in the boot process, when the main userspace is spawned\
 `modprobe` - hotload and probe kernel modules (such as zram/zswap) while the systerm is running
@@ -1037,7 +1042,7 @@ dev_item.seek_speed     0
 dev_item.bandwidth      0
 dev_item.generation     0
 ```
-and take note of the `dev_item.total_bytes` value. This is the total size, in bytes, the file system, and notice how this is bigger from the product found above, and by exactly 32767 bytes. This is 
+and take note of the `dev_item.total_bytes` value. This is the total size, in bytes, the file system, and notice how this is bigger from the product found above, and by exactly 32767*512 bytes, or 32767 _sectors_. This is 
 because the writable area for filesystem on the volume starts at sector 32768, _after_ the 32757 byte security header generated for the 
 filesystem by `cryptsecret` when the filesystem was first generated and encrypted!
 Now, because of this, if the `/dev/mapper/root` device were to be mounted using `mount /dev/mapper/root /mnt`, or inspected using 
@@ -1046,8 +1051,8 @@ Now, because of this, if the `/dev/mapper/root` device were to be mounted using 
 block device size is smaller than total_bytes in device item, has 1649250664960 expect >= 1649267441664
 ```
 is generated. However, this is okay and the device is not misaligned with the partition's filesystem area! It's simply because of the way `cryptsetup`
-sets the partition up with where it writes the file system that this happens, and the allocated block device is set up to start writing/reading encrypted data at the sector where the
-filesystem begins, and the security header (containing the encryption key) is written along with the filesystem.
+sets the partition up with where it writes the file system that this happens, the allocated block device is set up to start writing/reading encrypted data at the sector where the
+filesystem begins (32768), and the security header (containing the encryption key) is written along with the filesystem. If this didn't happen (i.e., the file system and the virtual device sizes were equal), data could be written somewhere where there is no filesystem and that data could never be found (in the last 32768*512 bytes of the partition/virtual device file). Meanwhile the file system thinks it's "full" with user data when really 16 MiB was just lost to the security header. However, because btrfs knows nothing about the encryption header, it gets "confused" when it encounters the virtual block device writing to it that's smaller than itself ("thinking" that it's the actual underlying storage device and therefore should be equal or greater in size when there's a very good reason it isn't), and then gives the above error. All in all, the file system should remain equal to the size of the partition (1.5 TiB here) even if the virtual block device allocated for it by `dmsetup` is smaller in order to avoid any problems with the filesystem filling up sooner than expected (although I suppose 16 MiB = 32768 sectors less isn't much of a big deal; there's certainly bigger issues if that much space gets used up).
 
 ## Git commit signing using `gpg` and how key pairs work
 Sign and verify commit signatures using git:\
@@ -1100,4 +1105,17 @@ since it's all user contributed stuff and not at all verified for security! Look
 popularity of the package, look through comments, look at how recent the latest update was, etc...There are also helpers made for this process, such as `yay`, but they're really not needed...
 
 ## Querying GPU/CPU stats
-Use `radeontop` or `nvtop` to query status of AMD CPU/GPU hardware (which can be installed using the main `pacman -S` package manager in Arch)
+Use `radeontop` or `nvtop` to query status of AMD CPU/GPU hardware (which can be installed using `pacman -S` on Arch)
+
+## Fixes on 4-19-24 for fixing bad boot issue
+_Man_ was this quite the scare with the system not booting...
+* Fixed wrong partition UUID (PARTUUID) configured in the boot loader kernel parameter options after the main partition was recreated after being resized
+  * BE SURE TO UPDATE THE `PARTUUID` KERNEL PARAMETER IN `/boot/loader/entries/*.conf` WHENEVER THE ROOT PARTITION'S UUID CHANGES!!!
+  * PRO TIP: Press `m` while in the `systemd-boot` bootloader's menu to modify kernel parameters before booting!
+* Deleted password for `root` by mounting the main file system `/dev/mapper/root` and `chroot`ing into the mount point while in the pre-boot emergency shell, then invoking `passwd -d root`.
+  * This fixed the root account console being locked whenever `systemd` was being launched after the root filesystem was mounted and `/sbin/init` was invoked.
+  * PRO TIP: Use `passwd -S <user>` to look up the status of a user's password.
+* Fixed `zram` config issue with the `writeback-device` parameter not working for some reason, which involved modifying the `/etc/systemd/zram-generator.conf`configuration file and restarting the `systemd-zram-setup@zram0` systemd service.
+  * Before the fix, the service was just failing to launch, which halted the entire `systemd` startup process and threw me into an emergency shell.
+* Fixed issue with `mount`ing on `/home` failing based on how it was defined in `/etc/fstab` since the btrfs subvolume `@home` got moved into the `/home` root directory somehow. This involved simply commenting out the `/home` mounting in `/etc/fstab`
+  * Before the fix, the `local-fs.target` systemd target was failing to complete since `mount -a` was failing.

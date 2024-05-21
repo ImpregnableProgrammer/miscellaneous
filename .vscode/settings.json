@@ -1,0 +1,6 @@
+{
+  "files.associations": {
+    "*.lc": "elsa",
+    "stdio.h": "c"
+  }
+}

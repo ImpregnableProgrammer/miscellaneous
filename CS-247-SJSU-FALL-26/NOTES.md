@@ -59,5 +59,15 @@
   * Solutions: statically scheduled superscaler processors, VLIW (very long instruction word) processors, or Dynamically scheduled superscaler processors
 
 # 9-24-26
-* MAC instructions used heavily in multiple issue -- "A Multiply-Accumulate (MAC) instruction in digital signal processing (DSP) computes the product of two numbers and adds that result to an accumulator register in a single clock cycle (A = A + x × y)."
-*
+* MAC instructions used heavily in multiple issue processors (VLIW processors) -- "A Multiply-Accumulate (MAC) instruction in digital signal processing (DSP) computes the product of two numbers and adds that result to an accumulator register in a single clock cycle (A = A + x × y)."
+  * Simultaneous instructions must be independent in VLIW processors
+  * Loop unrolling - simultaneously issue multiple independent instructions in single clock cycle across different iterations of a loop
+  * Modern microarchitectures (state of the art) utilize dynamic scheduling, multiple issue, and speculatiopn (branch prediction/instruction prefetching)
+    * Issue logic (namely hardware required to issue any instruction from RS as it gets ready after its slot is compared to ROB # on CDB) is biggest bottleneck
+* For branch prediction, need 3 key pieces of information implicitly - the condition, target address, and whether the upcoming instruction is a branch or not (since by the time next instruction fetch begins, current instruction, which could possibly be a branch, isn't decoded yet). 
+  * Use Branch Target Buffer (BTB) for this, to predict branching targets ahead of time. Without BTB, must always stall next instruction for how ever many cycles decode takes to ensure current instruction not a branch (so PC can be incremented sequentially). BTB stores & returns predicted PC for given PC input
+  * Branch folding - Optimization introduced by IBM as zero-delay branching strategy whereby target instruction cacheline itself stored in BTB instead of target address. Obviously requires much larger BTB as trade-off.
+* Return address predictor -- need this specifically for returns since function calls can happen from anywhere/any address, so return address can change across multiple function calls. Need stack to keep track of these return addresses. 
+  * Can't use BTB since it can only store one predicted address for any given address (even unconditional branches) meaning old ones are lost, corrupting predictions with unconditional function branching -- MUST supplement it with a stack to keep track of return address across unconditional function calls to know where to return.
+  * This is implemented as a completely separate entity from the BTB - a small stack
+  * Larger (in terms of # of stack entries) return address predictor generally correlated with reduced mispredictions

@@ -34,3 +34,30 @@
   * Multiple modes in modern architecture - application/user mode, supervisor mode, hypervisor mode, and machine (hardware) modes
   * Virtual Machine Monitor handles emulation/fundamental processes/address translations and flushing TLB (which could hold incorrect translations for same virtual addresses shared by different processes/OS's) as guest OS's are swapped between
   * Shadow page table used for virtual machine virtual address translations
+
+# 9-15-26 (MISSED CLASS :'( )
+
+# 9-17-26
+* For out-of-order (OOO) execution using Tomasulo's algorithm to handle WAW and WAR (Write-after-write and Read-after-Write) hazards, instructions are each given a data spot in the FIFO ReOrder Buffer (ROB) and until its operands (inputs) are ready, and are given a Reservation Station number (RS#) and spot in the RS for each operand/pipeline stage and the Common Data Bus (CDB) is monitored by RS for the RS# to appear letting system know corresponding operand is ready. Limited number of spots per RS with instructions beyond corresponding RS's capacity being blocked until one instruction in RS completes.
+  * Each operand station (pipeline stage/unit, such as ALU) has its own RS
+  * Once operands are ready as signaled by RS# and the data value pairs for the instruction, instructions are executed from RS's in the order data values are ready (either from other instructions or source registers) with instructions being able to bypass each pther as needed (but loads not bypassing stores and vice-versa for load/store stage with one RS)
+  * OOO different from in-order pipeline execution since only ways to compensate for hazards in in-order pipelines is by stalling, which stalls WHOLE pipeline!!
+  * Each destination/spource register (such as x1, f1, x2, f2, etc) will contain RS station number until operation for it finished and committed to ROB
+
+# 9-22-26
+* TOMASULO'S ALGORITHM: For ROB, space for instructions allocated in order of instructions, results written as instructions complete and bypass one another, but then results committed/written to register files and taken up by dependent entries in RS's from ROB in order of instructions during commit step to avoid instructional hazards in out-of-order execution
+  * ROB holds result of instruction between completion and commit, then results committed to register files in order of instructions. ROB has 4 fields: Instruction type (branch, store, or write to register -- to know what action to take at commit time), destination field (register number), oputput value, ready field (whether execution completed for instruction), and busy field (whether ROB entry is taken/still waiting on result)
+  * RS stores for each instruction -- Optype, and for each operand: whether it's ready, and its value
+  * Results then written to Reservation Station (RS) instruction entries that are potentially waiting on it as an operand 
+    * Until instruction complete, dependent entries in RS store decoded instruction along with ROB entry #'s for operands needed that aren't available yet -- then when data comes along with matching ROB # on CDB, value written to RS entry as operand, and once all operands available, instruction in RS entry executes
+* Issue (Allocate RS and ROB entries for instruction -- separate RS with multiple spots per operaation "station"), Execute (begin execution from RS once operands are available), Write result (write result and ROB # (or tag) to ROB), and Commit (once entry reaches head of FIFO ROB, send data on CDB, or flush all entries if instruction is result of misprediction now resolved)
+  * On branch misprediction, speculative entries in ROB are flushed
+  * Register and memory values NOT written until commit step!
+  * Once instruction reaches head of ROB for commit step, result written to register file AND dependent RS entry(ies) as necessary (using comparator at RS level to see whether missing operand is on CDB). Data is NOT read from ROB only since entries "removed" from ROB once they reach the head
+* To show Tomasulo's algorithm execution state in any one state of instructions in pipeline, need 3 tables: One for ROB state & entries, one for RS stations and entries (each RS station denoted by OP + #, e.g. ADD1, ADD2, MULT1, MULT2), and one for register file & entries
+* To achieve CPI < 1, need to complete multiple instructions per clock (multiple issue)
+  * Solutions: statically scheduled superscaler processors, VLIW (very long instruction word) processors, or Dynamically scheduled superscaler processors
+
+# 9-24-26
+* MAC instructions used heavily in multiple issue -- "A Multiply-Accumulate (MAC) instruction in digital signal processing (DSP) computes the product of two numbers and adds that result to an accumulator register in a single clock cycle (A = A + x × y)."
+*

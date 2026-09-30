@@ -71,3 +71,14 @@
   * Can't use BTB since it can only store one predicted address for any given address (even unconditional branches) meaning old ones are lost, corrupting predictions with unconditional function branching -- MUST supplement it with a stack to keep track of return address across unconditional function calls to know where to return.
   * This is implemented as a completely separate entity from the BTB - a small stack
   * Larger (in terms of # of stack entries) return address predictor generally correlated with reduced mispredictions
+
+# 9-29-26
+* Register naming with larger register file can be used instead of storing speculative data in reorder buffer and reservation stations until commit is complete.
+  * In traditional designs (like Tomasulo's algorithm with an explicit ROB), speculative results are stored inside the ROB entries or reservation stations until instructions commit.
+  * The register renaming approach changes that by creating a single register pool that contains both architecturally visible registers and virtual (speculative) registers. A hardware-based map (Register Alias Table, RAT) manages the renaming process during the instruction issue phase.
+  * Because every instruction simply writes its result directly to an assigned slot in this unified physical pool, WAW and WAR hazards are completely avoided.
+  * NOT very energy efficient
+* It's not necessary that bigger and dumber processors are better than smaller smarter ones, and vice-verse. NO SINGLE KNOWN BEST SOLUTION. Highly out of order & speculative processors better than in-order, nonspeculative ones in some cases, and worse in others
+* Processors with faster clock rates and/or lower CPIs will NOT necessarily be faster, as CPUs with faster clocks often require more instructions, and execution_time = Inst_num * Avg_CPI * Cycle_time
+* It's not easy to predict the performance/energy efficiency of two different ISA's if we hold the technology constant due confounding factors
+* It's not always true that large amounts of Instruction-Level Parallelism is available
